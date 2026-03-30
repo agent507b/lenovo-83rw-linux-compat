@@ -1,0 +1,64 @@
+**[UPDATE - March 30 — Final diagnostic conclusion]**
+
+After extensive testing this weekend, the root cause is now fully confirmed.
+
+---
+
+**Test 1 — nvidia_modeset conflict isolation**
+
+Suspected that the `video` ACPI module being shared between `xe` and `nvidia_modeset` could be intercepting the backlight PWM path.
+
+Action: fully blacklisted all Nvidia modules (`nvidia`, `nvidia_modeset`, `nvidia_drm`, `nvidia_uvm`).
+
+```
+modprobe.blacklist=nouveau,ideapad_laptop,nvidia_wmi_ec_backlight,
+                  nvidia_modeset,nvidia_drm,nvidia
+```
+
+Result after reboot:
+```
+=== BACKLIGHT SYSFS ===
+brightness:        1        ← kernel write successful
+max_brightness:    192000
+actual_brightness: 1        ← software readback correct
+
+=== MODULES ===
+video   81920   1 xe        ← no more nvidia_modeset conflict ✓
+```
+
+Physical panel: still locked at 100%. Eliminating Nvidia changed nothing on the hardware side.
+
+---
+
+**Test 2 — xe-only confirmation**
+
+With exclusively the Intel `xe` driver active (no i915, no nvidia, no ideapad), the desync persists:
+- OS writes `1` → software reads back `1` ✓
+- Physical panel remains at 100% duty cycle ✗
+
+---
+
+**Panel identification (via ddcutil)**
+
+```
+DRM connector:  card0-eDP-1
+Manufacturer:   EDO
+Model:          EF25QBA63.E
+Product code:   13333 (0x3415)
+Manufacture:    2025, Week 25
+DDC/CI:         Not supported (I2C slave x37 unresponsive)
+```
+
+---
+
+**Final conclusion**
+
+The Intel `xe` driver correctly writes to the backlight register. The kernel correctly reads back the value. The physical panel ignores the PWM command entirely.
+
+This confirms a VBT (Video BIOS Table) mapping error in firmware `T4CN38WW`: the backlight PWM signal is not routed to the eDP panel controller for the `EDO EF25QBA63.E` display on model 83RW.
+
+No kernel parameter, no driver combination, and no software-level fix can resolve this. **A firmware update from Lenovo Engineering is required.**
+
+Support ticket #2030140865 has been escalated accordingly.
+
+If you own a Legion 5 15IPH11 (83RW) and experience this under Linux, please reply — multiple reports increase the chance of a firmware fix being prioritized.

@@ -1,0 +1,16 @@
+@armurthy @suresh_kurmi
+Here are the boot dmesg logs with drm.debug=0x1e log_buf_len=4M.
+System:
+
+Kernel: 6.19.10-200.fc43.x86_64
+Driver: xe (Panther Lake, 0000:00:02.0)
+Panel: EDO EF25QBA63.E (eDP-1, 2560x1600, 165Hz)
+Blacklisted: nvidia, nvidia_modeset, nvidia_drm, nvidia_wmi_ec_backlight, ideapad_laptop
+
+Root cause identified in logs:
+The VBT contains wrong panel identity data: parse_lfp_data: Panel manufacturer "MS_", product code 3, year 2002 → VBT describes a 2002 MS panel instead of the actual EDO EF25QBA63.E (2025)
+The backlight initializes on the wrong controller: cnp_setup_backlight: Using native PCH PWM (controller=0) intel_backlight_setup: backlight initialized, disabled, brightness 0/192000 → Starts at 0/disabled but physical panel stays at 100% duty cycle
+Writing any value to /sys/class/backlight/intel_backlight/brightness updates the sysfs value correctly but has zero effect on the physical panel.
+This confirms a VBT panel mapping error in firmware T4CN38WW (Lenovo Legion 5 15IPH11, model 83RW): the PWM signal is not routed to the EDO EF25QBA63.E panel controller.
+Key log excerpt (boot, journalctl -k --boot=0):
+tell me if you need other infos
